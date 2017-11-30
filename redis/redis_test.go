@@ -9,7 +9,7 @@ func Test_test(t *testing.T) {
 
 	config := &Config{
 		NodeName: "default",
-		Host:     "10.138.230.23",
+		Host:     "127.0.0.1",
 		Port:     6471,
 		Database: 0,
 		Password: "0fb9409323ca0af6",
