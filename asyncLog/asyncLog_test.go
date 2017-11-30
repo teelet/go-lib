@@ -10,7 +10,7 @@ import (
 
 func Test_test(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		CLILog("./cli.log", "hello log "+strconv.Itoa(i), Error)
+		CLILog("./log.txt", "hello log "+strconv.Itoa(i), Error)
 	}
 	time.Sleep(100 * time.Second)
 }

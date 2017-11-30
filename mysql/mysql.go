@@ -78,15 +78,17 @@ func (dao *Dao) Select(sqlStr string, args ...interface{}) ([]map[string]interfa
 	} else {
 		stmt, err = dao.db.Prepare(sqlStr)
 	}
+	if err != nil {
+		return nil, err
+	}
 	defer stmt.Close()
-	if err != nil {
-		return nil, err
-	}
+
 	rows, err = stmt.Query(args...)
-	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
 	columns, _ := rows.Columns()
 	values := make([]interface{}, len(columns))
 	scans := make([]interface{}, len(columns))
@@ -143,10 +145,11 @@ func (dao *Dao) Delete(sqlStr string, args ...interface{}) (int64, error) {
 	} else {
 		stmt, err = dao.db.Prepare(sqlStr)
 	}
-	defer stmt.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer stmt.Close()
+
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err
@@ -165,10 +168,11 @@ func (dao *Dao) Update(sqlStr string, args ...interface{}) (int64, error) {
 	} else {
 		stmt, err = dao.db.Prepare(sqlStr)
 	}
-	defer stmt.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer stmt.Close()
+
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err
@@ -187,10 +191,11 @@ func (dao *Dao) Insert(sqlStr string, args ...interface{}) (int64, error) {
 	} else {
 		stmt, err = dao.db.Prepare(sqlStr)
 	}
-	defer stmt.Close()
 	if err != nil {
 		return 0, err
 	}
+	defer stmt.Close()
+
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err

@@ -2,6 +2,8 @@ package asyncLog
 
 import (
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -13,8 +15,8 @@ import (
 const (
 	logFromWeb   = "web"
 	logFromCli   = "cli"
-	logChanCap   = 10000
-	logWriterNum = 2
+	logChanCap   = 100000
+	logWriterNum = 10
 	logTimeOut   = 100 * time.Millisecond
 	logFormat    = "[%s] [%s] [%s] [%s] [%s]\n"
 )
@@ -99,14 +101,22 @@ func createWriter(lc chan *logItem) {
 
 //write log to file
 func do(li *logItem) chan int {
-	file, _ := os.OpenFile(li.logFile, os.O_CREATE|os.O_APPEND, 0777)
+	file, err := os.OpenFile(li.logFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0777)
+	if err != nil {
+		log.Println(err)
+	}
 	hostname, _ := os.Hostname()
 	reqStr := ""
 	if li.protocol == logFromWeb && li.request != nil {
-		reqStr = li.request.RequestURI + " " + li.request.RemoteAddr
+		reqStr = "REQUEST_URI=" + li.request.RequestURI + " REMOTE_ADDR=" + realIP(li.request)
 	}
 	msg := fmt.Sprintf(logFormat, logLeveName[li.level], time.Now().Format("2006-01-02 15:04:05"), hostname, reqStr, strings.TrimSpace(li.logMsg))
-	file.WriteString(msg)
+	_, errWrite := file.WriteString(msg)
+	if errWrite != nil {
+		log.Println(errWrite)
+	}
+	// log.Printf("write to %s", li.logFile)
+	// log.Print(msg)
 	file.Close()
 	c := make(chan int, 1)
 	c <- 1
@@ -132,4 +142,16 @@ func CLILog(file string, log string, level int) {
 	item.logMsg = log
 	item.level = level
 	logChan <- item
+}
+
+func realIP(r *http.Request) string {
+	ra := r.RemoteAddr
+	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+		ra = strings.Split(ip, ", ")[0]
+	} else if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		ra = ip
+	} else {
+		ra, _, _ = net.SplitHostPort(ra)
+	}
+	return ra
 }

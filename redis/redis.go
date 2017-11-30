@@ -589,6 +589,40 @@ func (rao *Rao) LRange(key string, start, stop int64) (interface{}, error) {
 	return value, nil
 }
 
+//LGet lget
+func (rao *Rao) LGet(key string, index int) (interface{}, error) {
+	var conn rds.Conn
+	var err error
+	var value interface{}
+	if rao.conn != nil {
+		conn = *(rao.conn)
+	} else if rao.pool != nil {
+		conn = rao.pool.Get()
+		defer conn.Close()
+	}
+	if value, err = conn.Do("LGET", key, index); err != nil {
+		return nil, err
+	}
+	return rtti(value), nil
+}
+
+//RGet rget
+func (rao *Rao) RGet(key string, index int) (interface{}, error) {
+	var conn rds.Conn
+	var err error
+	var value interface{}
+	if rao.conn != nil {
+		conn = *(rao.conn)
+	} else if rao.pool != nil {
+		conn = rao.pool.Get()
+		defer conn.Close()
+	}
+	if value, err = conn.Do("RGET", key, index); err != nil {
+		return nil, err
+	}
+	return rtti(value), nil
+}
+
 //SAdd sadd
 func (rao *Rao) SAdd(key string, args []interface{}) error {
 	var conn rds.Conn
