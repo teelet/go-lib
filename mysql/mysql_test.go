@@ -32,15 +32,15 @@ func Test_test(t *testing.T) {
 	fmt.Println(lastID)
 
 	//trans
-	dao.Begin()
-	dao.Delete("delete from root where id > 1")
-	dao.Rockback()
+	tx, _ := dao.Begin()
+	tx.Delete("delete from root where id > 1")
+	tx.Rollback()
 	ress, _ := dao.Select("select count(*) as count from root")
 	fmt.Println(ress)
 
-	dao.Begin()
-	dao.Delete("delete from root where id > 1")
-	dao.Commit()
+	tx, _ = dao.Begin()
+	tx.Delete("delete from root where id > 1")
+	tx.Commit()
 	resss, _ := dao.Select("select count(*) as count from root")
 	fmt.Println(resss)
 }
