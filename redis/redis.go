@@ -99,6 +99,7 @@ func NewPool(config *Config) *rds.Pool {
 		MaxIdle:     config.MaxIdle,
 		IdleTimeout: time.Duration(config.ConnIdleTimeout) * time.Second,
 		Dial:        dialFunc,
+		Wait:        true,
 	}
 	return pool
 }
@@ -151,6 +152,22 @@ func (rao *Rao) Set(key string, val interface{}) error {
 	return nil
 }
 
+//Setnx setnx
+func (rao *Rao) Setnx(key string, val interface{}) (int64, error) {
+	var conn rds.Conn
+	if rao.conn != nil {
+		conn = *(rao.conn)
+	} else if rao.pool != nil {
+		conn = rao.pool.Get()
+		defer conn.Close()
+	}
+	if n, err := conn.Do("SETNX", key, val); err != nil {
+		return -1, err
+	} else {
+		return n.(int64), nil
+	}
+}
+
 //Del del
 func (rao *Rao) Del(key string) error {
 	var conn rds.Conn
@@ -188,7 +205,7 @@ func (rao *Rao) Exists(key string) (bool, error) {
 }
 
 //Expire expire
-func (rao *Rao) Expire(key string, expire interface{}) error {
+func (rao *Rao) Expire(key string, expire int64) error {
 	var conn rds.Conn
 	var err error
 	if rao.conn != nil {
@@ -281,67 +298,67 @@ func (rao *Rao) MGet(keys []interface{}) (map[string]interface{}, error) {
 }
 
 //Incr incr
-func (rao *Rao) Incr(key string) error {
+func (rao *Rao) Incr(key string) (int64, error) {
 	var conn rds.Conn
-	var err error
 	if rao.conn != nil {
 		conn = *(rao.conn)
 	} else if rao.pool != nil {
 		conn = rao.pool.Get()
 		defer conn.Close()
 	}
-	if _, err = conn.Do("INCR", key); err != nil {
-		return err
+	if n, err := conn.Do("INCR", key); err != nil {
+		return 0, err
+	} else {
+		return n.(int64), nil
 	}
-	return nil
 }
 
 //IncrBy incrby
-func (rao *Rao) IncrBy(key string, num int64) error {
+func (rao *Rao) IncrBy(key string, num int64) (int64, error) {
 	var conn rds.Conn
-	var err error
 	if rao.conn != nil {
 		conn = *(rao.conn)
 	} else if rao.pool != nil {
 		conn = rao.pool.Get()
 		defer conn.Close()
 	}
-	if _, err = conn.Do("INCRBY", key, num); err != nil {
-		return err
+	if n, err := conn.Do("INCRBY", key, num); err != nil {
+		return 0, err
+	} else {
+		return n.(int64), nil
 	}
-	return nil
 }
 
 //Decr decr
-func (rao *Rao) Decr(key string) error {
+func (rao *Rao) Decr(key string) (int64, error) {
 	var conn rds.Conn
-	var err error
 	if rao.conn != nil {
 		conn = *(rao.conn)
 	} else if rao.pool != nil {
 		conn = rao.pool.Get()
 		defer conn.Close()
 	}
-	if _, err = conn.Do("DECR", key); err != nil {
-		return err
+	if n, err := conn.Do("DECR", key); err != nil {
+		return 0, err
+	} else {
+		return n.(int64), nil
 	}
-	return nil
 }
 
 //DecrBy decrby
-func (rao *Rao) DecrBy(key string, num int64) error {
+func (rao *Rao) DecrBy(key string, num int64) (int64, error) {
 	var conn rds.Conn
-	var err error
 	if rao.conn != nil {
 		conn = *(rao.conn)
 	} else if rao.pool != nil {
 		conn = rao.pool.Get()
 		defer conn.Close()
 	}
-	if _, err = conn.Do("DECRBY", key, num); err != nil {
-		return err
+	if n, err := conn.Do("DECRBY", key, num); err != nil {
+		return 0, err
+	} else {
+		return n.(int64), nil
 	}
-	return nil
 }
 
 //HSet hset
@@ -587,40 +604,6 @@ func (rao *Rao) LRange(key string, start, stop int64) (interface{}, error) {
 		value = append(value, rtti(v))
 	}
 	return value, nil
-}
-
-//LGet lget
-func (rao *Rao) LGet(key string, index int) (interface{}, error) {
-	var conn rds.Conn
-	var err error
-	var value interface{}
-	if rao.conn != nil {
-		conn = *(rao.conn)
-	} else if rao.pool != nil {
-		conn = rao.pool.Get()
-		defer conn.Close()
-	}
-	if value, err = conn.Do("LGET", key, index); err != nil {
-		return nil, err
-	}
-	return rtti(value), nil
-}
-
-//RGet rget
-func (rao *Rao) RGet(key string, index int) (interface{}, error) {
-	var conn rds.Conn
-	var err error
-	var value interface{}
-	if rao.conn != nil {
-		conn = *(rao.conn)
-	} else if rao.pool != nil {
-		conn = rao.pool.Get()
-		defer conn.Close()
-	}
-	if value, err = conn.Do("RGET", key, index); err != nil {
-		return nil, err
-	}
-	return rtti(value), nil
 }
 
 //SAdd sadd
