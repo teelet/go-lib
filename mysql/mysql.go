@@ -14,7 +14,10 @@ var dbIns sync.Map
 //Dao dao
 type Dao struct {
 	db *sql.DB
-	tx *sql.Tx
+}
+
+type Tx struct {
+	t *sql.Tx
 }
 
 //Config config
@@ -36,7 +39,6 @@ func GetDB(config *Config) (*Dao, error) {
 	dao := new(Dao)
 	if db, ok := dbIns.Load(config.NodeName); ok {
 		dao.db = db.(*sql.DB)
-		dao.tx = nil
 		return dao, nil
 	}
 	db, err := NewDB(config)
@@ -45,7 +47,6 @@ func GetDB(config *Config) (*Dao, error) {
 	}
 	dbIns.Store(config.NodeName, db)
 	dao.db = db
-	dao.tx = nil
 	return dao, nil
 }
 
@@ -73,22 +74,16 @@ func (dao *Dao) Select(sqlStr string, args ...interface{}) ([]map[string]interfa
 	var stmt *sql.Stmt
 	var err error
 	var rows *sql.Rows
-	if dao.tx != nil {
-		stmt, err = dao.tx.Prepare(sqlStr)
-	} else {
-		stmt, err = dao.db.Prepare(sqlStr)
-	}
+	stmt, err = dao.db.Prepare(sqlStr)
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-
 	rows, err = stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	columns, _ := rows.Columns()
 	values := make([]interface{}, len(columns))
 	scans := make([]interface{}, len(columns))
@@ -140,16 +135,11 @@ func (dao *Dao) Delete(sqlStr string, args ...interface{}) (int64, error) {
 	var stmt *sql.Stmt
 	var err error
 	var result sql.Result
-	if dao.tx != nil {
-		stmt, err = dao.tx.Prepare(sqlStr)
-	} else {
-		stmt, err = dao.db.Prepare(sqlStr)
-	}
+	stmt, err = dao.db.Prepare(sqlStr)
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
-
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err
@@ -163,16 +153,11 @@ func (dao *Dao) Update(sqlStr string, args ...interface{}) (int64, error) {
 	var stmt *sql.Stmt
 	var err error
 	var result sql.Result
-	if dao.tx != nil {
-		stmt, err = dao.tx.Prepare(sqlStr)
-	} else {
-		stmt, err = dao.db.Prepare(sqlStr)
-	}
+	stmt, err = dao.db.Prepare(sqlStr)
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
-
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err
@@ -186,16 +171,126 @@ func (dao *Dao) Insert(sqlStr string, args ...interface{}) (int64, error) {
 	var stmt *sql.Stmt
 	var err error
 	var result sql.Result
-	if dao.tx != nil {
-		stmt, err = dao.tx.Prepare(sqlStr)
-	} else {
-		stmt, err = dao.db.Prepare(sqlStr)
-	}
+	stmt, err = dao.db.Prepare(sqlStr)
 	if err != nil {
 		return 0, err
 	}
 	defer stmt.Close()
+	result, err = stmt.Exec(args...)
+	if err != nil {
+		return 0, err
+	}
+	lastInsertID, _ := result.LastInsertId()
+	return lastInsertID, nil
+}
 
+//Select select
+func (tx *Tx) Select(sqlStr string, args ...interface{}) ([]map[string]interface{}, error) {
+	var stmt *sql.Stmt
+	var err error
+	var rows *sql.Rows
+	stmt, err = tx.t.Prepare(sqlStr)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err = stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns, _ := rows.Columns()
+	values := make([]interface{}, len(columns))
+	scans := make([]interface{}, len(columns))
+	for i := range values {
+		scans[i] = &values[i]
+	}
+	var result []map[string]interface{}
+	for rows.Next() {
+		err = rows.Scan(scans...)
+		if err != nil {
+			continue
+		}
+		record := make(map[string]interface{})
+		for i, val := range values {
+			switch val.(type) {
+			case nil:
+				record[columns[i]] = nil
+			case bool:
+				record[columns[i]] = bool(val.(bool))
+			case byte:
+				record[columns[i]] = byte(val.(byte))
+			case int8:
+				record[columns[i]] = int8(val.(int8))
+			case int16:
+				record[columns[i]] = int16(val.(int16))
+			case int32:
+				record[columns[i]] = int32(val.(int32))
+			case int:
+				record[columns[i]] = int(val.(int))
+			case int64:
+				record[columns[i]] = int64(val.(int64))
+			case float32:
+				record[columns[i]] = float32(val.(float32))
+			case float64:
+				record[columns[i]] = float64(val.(float64))
+			case []byte:
+				record[columns[i]] = string(val.([]byte))
+			default:
+				record[columns[i]] = string(val.([]byte))
+			}
+		}
+		result = append(result, record)
+	}
+	return result, nil
+}
+
+//Delete delete
+func (tx *Tx) Delete(sqlStr string, args ...interface{}) (int64, error) {
+	var stmt *sql.Stmt
+	var err error
+	var result sql.Result
+	stmt, err = tx.t.Prepare(sqlStr)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+	result, err = stmt.Exec(args...)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	return rowsAffected, nil
+}
+
+//Update update
+func (tx *Tx) Update(sqlStr string, args ...interface{}) (int64, error) {
+	var stmt *sql.Stmt
+	var err error
+	var result sql.Result
+	stmt, err = tx.t.Prepare(sqlStr)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+	result, err = stmt.Exec(args...)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	return rowsAffected, nil
+}
+
+//Insert insert
+func (tx *Tx) Insert(sqlStr string, args ...interface{}) (int64, error) {
+	var stmt *sql.Stmt
+	var err error
+	var result sql.Result
+	stmt, err = tx.t.Prepare(sqlStr)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
 	result, err = stmt.Exec(args...)
 	if err != nil {
 		return 0, err
@@ -205,32 +300,29 @@ func (dao *Dao) Insert(sqlStr string, args ...interface{}) (int64, error) {
 }
 
 //Begin begin
-func (dao *Dao) Begin() error {
-	tx, err := dao.db.Begin()
+func (dao *Dao) Begin() (*Tx, error) {
+	t, err := dao.db.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	dao.tx = tx
-	return nil
+	return &Tx{t}, nil
 }
 
 //Commit commit
-func (dao *Dao) Commit() error {
-	err := dao.tx.Commit()
+func (tx *Tx) Commit() error {
+	err := tx.t.Commit()
 	if err != nil {
 		return err
 	}
-	dao.tx = nil
 	return nil
 }
 
-//Rockback rockback
-func (dao *Dao) Rockback() error {
-	err := dao.tx.Rollback()
+//Rollback rollback
+func (tx *Tx) Rollback() error {
+	err := tx.t.Rollback()
 	if err != nil {
 		return err
 	}
-	dao.tx = nil
 	return nil
 }
 
@@ -241,6 +333,5 @@ func (dao *Dao) Close() error {
 		return err
 	}
 	dao.db = nil
-	dao.tx = nil
 	return nil
 }
