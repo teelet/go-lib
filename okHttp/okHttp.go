@@ -39,9 +39,7 @@ func urlSlave(reqURL string) ([]string, error) {
 	} else {
 		return nil, errors.New("request url error")
 	}
-	tmpURL := []rune(reqURL)
-	tmpScheme := []rune(scheme)
-	reqURL = string(tmpURL[len(tmpScheme):])
+	reqURL = strings.TrimPrefix(reqURL, scheme)
 	sps := strings.SplitN(reqURL, "/", 2)
 	hostStr := sps[0]
 	uri := ""
