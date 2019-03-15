@@ -7,6 +7,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" //mysql dirver
+	"strings"
 )
 
 var dbIns sync.Map
@@ -52,7 +53,7 @@ func GetDB(config *Config) (*Dao, error) {
 
 //NewDB newdb
 func NewDB(config *Config) (*sql.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s", config.UserName, config.Password, config.Host, config.Port, config.Database, config.Charset)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=%s&multiStatements=true", config.UserName, config.Password, config.Host, config.Port, config.Database, config.Charset)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
@@ -98,36 +99,96 @@ func (dao *Dao) Select(sqlStr string, args ...interface{}) ([]map[string]interfa
 		}
 		record := make(map[string]interface{})
 		for i, val := range values {
-			switch val.(type) {
-			case nil:
-				record[columns[i]] = nil
-			case bool:
-				record[columns[i]] = bool(val.(bool))
-			case byte:
-				record[columns[i]] = byte(val.(byte))
-			case int8:
-				record[columns[i]] = int8(val.(int8))
-			case int16:
-				record[columns[i]] = int16(val.(int16))
-			case int32:
-				record[columns[i]] = int32(val.(int32))
-			case int:
-				record[columns[i]] = int(val.(int))
-			case int64:
-				record[columns[i]] = int64(val.(int64))
-			case float32:
-				record[columns[i]] = float32(val.(float32))
-			case float64:
-				record[columns[i]] = float64(val.(float64))
-			case []byte:
-				record[columns[i]] = string(val.([]byte))
-			default:
-				record[columns[i]] = string(val.([]byte))
-			}
+			record[columns[i]] = rtti(val)
 		}
 		result = append(result, record)
 	}
 	return result, nil
+}
+
+//MultiSelect multi select
+func (dao *Dao) MultiSelect(sqlList []string) ([][]map[string]interface{}, error) {
+	var sqlStr = strings.Join(sqlList, ";")
+	var err error
+	var rows *sql.Rows
+	rows, err = dao.db.Query(sqlStr)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	columns, _ := rows.Columns()
+	values := make([]interface{}, len(columns))
+	scans := make([]interface{}, len(columns))
+	for i := range values {
+		scans[i] = &values[i]
+	}
+	var list []map[string]interface{}
+	var result [][]map[string]interface{}
+	for rows.Next() {
+		err = rows.Scan(scans...)
+		if err != nil {
+			continue
+		}
+		record := make(map[string]interface{})
+		for i, val := range values {
+			record[columns[i]] = rtti(val)
+		}
+		list = append(list, record)
+	}
+	result = append(result, list)
+
+	for rows.NextResultSet() {
+		columns, _ := rows.Columns()
+		values := make([]interface{}, len(columns))
+		scans := make([]interface{}, len(columns))
+		for i := range values {
+			scans[i] = &values[i]
+		}
+		var list []map[string]interface{}
+		for rows.Next() {
+			err = rows.Scan(scans...)
+			if err != nil {
+				continue
+			}
+			record := make(map[string]interface{})
+			for i, val := range values {
+				record[columns[i]] = rtti(val)
+			}
+			list = append(list, record)
+		}
+		result = append(result, list)
+	}
+
+	return result, nil
+}
+
+func rtti(val interface{}) interface{} {
+	switch val.(type) {
+	case nil:
+		return nil
+	case bool:
+		return bool(val.(bool))
+	case byte:
+		return byte(val.(byte))
+	case int8:
+		return int8(val.(int8))
+	case int16:
+		return int16(val.(int16))
+	case int32:
+		return int32(val.(int32))
+	case int:
+		return int(val.(int))
+	case int64:
+		return int64(val.(int64))
+	case float32:
+		return float32(val.(float32))
+	case float64:
+		return float64(val.(float64))
+	case []byte:
+		return string(val.([]byte))
+	default:
+		return string(val.([]byte))
+	}
 }
 
 //Delete delete
@@ -213,32 +274,7 @@ func (tx *Tx) Select(sqlStr string, args ...interface{}) ([]map[string]interface
 		}
 		record := make(map[string]interface{})
 		for i, val := range values {
-			switch val.(type) {
-			case nil:
-				record[columns[i]] = nil
-			case bool:
-				record[columns[i]] = bool(val.(bool))
-			case byte:
-				record[columns[i]] = byte(val.(byte))
-			case int8:
-				record[columns[i]] = int8(val.(int8))
-			case int16:
-				record[columns[i]] = int16(val.(int16))
-			case int32:
-				record[columns[i]] = int32(val.(int32))
-			case int:
-				record[columns[i]] = int(val.(int))
-			case int64:
-				record[columns[i]] = int64(val.(int64))
-			case float32:
-				record[columns[i]] = float32(val.(float32))
-			case float64:
-				record[columns[i]] = float64(val.(float64))
-			case []byte:
-				record[columns[i]] = string(val.([]byte))
-			default:
-				record[columns[i]] = string(val.([]byte))
-			}
+			record[columns[i]] = rtti(val)
 		}
 		result = append(result, record)
 	}
