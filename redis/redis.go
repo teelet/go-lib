@@ -916,6 +916,28 @@ func (rao *Rao) ZRevRangeByScore(key string, min, max int64, withScores bool) ([
 	return nil, nil, nil
 }
 
+//Pipeline multi
+func (rao *Rao) Pipeline(argArray []map[string][]interface{}) error {
+	if len(argArray) <= 0 {
+		return nil
+	}
+	var conn rds.Conn
+	if rao.conn != nil {
+		conn = *(rao.conn)
+	} else if rao.pool != nil {
+		conn = rao.pool.Get()
+		defer conn.Close()
+	}
+
+	for _, itemMap := range argArray {
+		for command, args := range itemMap {
+			conn.Send(command, args...)
+		}
+	}
+
+	return conn.Flush()
+}
+
 func rtti(val interface{}) interface{} {
 	var value interface{}
 	switch val.(type) {
