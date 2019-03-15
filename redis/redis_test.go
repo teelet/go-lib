@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -10,13 +11,30 @@ func Test_test(t *testing.T) {
 	config := &Config{
 		NodeName: "default",
 		Host:     "127.0.0.1",
-		Port:     6471,
+		Port:     6379,
 		Database: 0,
-		Password: "0fb9409323ca0af6",
+		Password: "",
 	}
 
 	rao, _ := GetRedis(config)
 	defer rao.Close()
+
+	//pipeline
+
+	var argArray = []map[string][]interface{}{
+		{
+			"SETEX": {"test_1", 60, 1},
+		},
+		{
+			"SETEX": {"test_2", 60, 2},
+		},
+	}
+
+	err1 := rao.Pipeline(argArray)
+	fmt.Println(err1)
+
+	os.Exit(0)
+
 	//set
 	err := rao.Set("111_222", 123)
 
@@ -50,19 +68,19 @@ func Test_test(t *testing.T) {
 	fmt.Println(val3)
 
 	//incr
-	err = rao.Incr("111_444")
+	_, err = rao.Incr("111_444")
 	//fmt.Println(err)
 
 	//incrby
-	err = rao.IncrBy("111_444", 100)
+	_, err = rao.IncrBy("111_444", 100)
 	//fmt.Println(err)
 
 	//incr
-	err = rao.Decr("111_555")
+	_, err = rao.Decr("111_555")
 	fmt.Println(err)
 
 	//decrby
-	err = rao.DecrBy("111_555", 200)
+	_, err = rao.DecrBy("111_555", 200)
 	fmt.Println(err)
 
 	//hset
